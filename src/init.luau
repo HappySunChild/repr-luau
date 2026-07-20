@@ -1,19 +1,21 @@
 export type ReprOptions = {
-	pretty: boolean?,
+	pretty_tables: boolean?,
 	show_function_debug_names: boolean?,
 	show_function_bodies: boolean?,
 	show_buffer_bytes: boolean?,
 	show_table_fields: boolean?,
 	convert_numerical_language_constants: boolean?,
+	max_table_depth: number?,
 }
 
 const DEFAULT_OPTIONS: ReprOptions = {
-	pretty = true,
+	pretty_tables = true,
 	show_function_debug_names = false,
 	show_function_bodies = true,
 	show_buffer_bytes = true,
 	show_table_fields = true,
 	convert_numerical_language_constants = true,
+	max_table_depth = 20, -- seems reasonable to me
 }
 
 type RenderedPair = { key: string, value: string }
@@ -28,15 +30,15 @@ const function render_table(rendered_pairs: { RenderedPair }, indent: number, pr
 		const inner_indent = string.rep("\t", indent + 1)
 		const lines = { "{" }
 
-		for _, pair in rendered_pairs do
-			table.insert(lines, `{inner_indent}{pair.key} = {pair.value},`)
+		for i, pair in rendered_pairs do
+			lines[i + 1] = `{inner_indent}{pair.key} = {pair.value},`
 		end
 
 		table.insert(lines, `{outer_indent}}`)
 
 		return table.concat(lines, "\n")
 	else
-		const fields = {}
+		const fields = table.create(#rendered_pairs)
 
 		for _, pair in rendered_pairs do
 			table.insert(fields, `{pair.key} = {pair.value}`)
@@ -88,7 +90,7 @@ const function is_luau_identifier(v: any): boolean
 		return false
 	end
 
-	if LUAU_KEYWORDS[v] ~= nil then
+	if LUAU_KEYWORDS[v] then
 		return false
 	end
 
@@ -116,7 +118,7 @@ const function repr_primitive(x: any, options: ReprOptions): string
 		end
 
 		return tostring(x)
-	elseif x_type == "integer" then
+	elseif x_type == "integer" then -- integers are generally niche, but they are technically a different data type
 		return `{x}i`
 	elseif x_type == "vector" then
 		return `vector.create({repr_primitive(x.x, options)}, {repr_primitive(x.y, options)}, {repr_primitive(
@@ -158,12 +160,12 @@ const function repr_primitive(x: any, options: ReprOptions): string
 		const display_args = table.concat(arg_list, ", ")
 
 		const display_name = if show_debug_name and is_luau_identifier(debug_name) then debug_name else ""
-		const display_body = if show_body then " ... end" else ""
+		const display_body = if show_body then " end" else ""
 
 		return `function {display_name}({display_args}){display_body}`
 	end
 
-	return `<{x}>`
+	return `<{x_type}: {x}>`
 end
 
 const function repr_table(
@@ -172,12 +174,12 @@ const function repr_table(
 	depth: number,
 	options: ReprOptions
 ): string
-	if not options.show_table_fields then
+	if not options.show_table_fields or options.max_table_depth ~= nil and depth >= options.max_table_depth then
 		return "{ ... }"
 	end
 
 	if showing[current] ~= nil then
-		return "{ RECURSIVE }"
+		return `\{ RECURSIVE +{depth - showing[current]} }`
 	end
 
 	showing[current] = depth
@@ -202,7 +204,7 @@ const function repr_table(
 
 	table.sort(rendered_pairs, sort_pairs)
 
-	local output = render_table(rendered_pairs, depth, options.pretty)
+	local output = render_table(rendered_pairs, depth, options.pretty_tables)
 	const metatable = getmetatable(current) :: any?
 
 	if type(metatable) == "table" then
@@ -219,17 +221,13 @@ const function repr_table(
 end
 
 const function repr(x: any, options: ReprOptions?): string
-	const x_type = type(x)
-
 	options = options or DEFAULT_OPTIONS
 
-	if x_type == "table" then
-		const showing = {}
-
-		return repr_table(x, showing, 0, options)
+	if type(x) == "table" then
+		return repr_table(x, {}, 0, options)
+	else
+		return repr_primitive(x, options)
 	end
-
-	return repr_primitive(x, options)
 end
 
 return repr
