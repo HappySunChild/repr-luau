@@ -44,8 +44,7 @@ const function sort_pairs(a: RenderedPair, b: RenderedPair)
 	return a.key < b.key
 end
 
-const LUAU_KEYWORD = {
-	-- ["const"] = true, -- const technically isn't a keyword
+const LUAU_KEYWORDS = {
 	["and"] = true,
 	["break"] = true,
 	["continue"] = true,
@@ -79,18 +78,18 @@ const function is_luau_identifier(v: any): boolean
 		return false
 	end
 
-	if string.match(v, "^[%a_][%w_]*") == nil then
+	if string.match(v, "^[%a_][%w_]*$") == nil then
 		return false
 	end
 
-	if LUAU_KEYWORD[v] ~= nil then
+	if LUAU_KEYWORDS[v] ~= nil then
 		return false
 	end
 
 	return true
 end
 
-const function repr(x: any, options: ReprOptions?)
+const function repr_primitive(x: any, options: ReprOptions)
 	const x_type = type(x)
 
 	if x_type == "nil" then
@@ -112,17 +111,19 @@ const function repr(x: any, options: ReprOptions?)
 	elseif x_type == "integer" then
 		return `{x}i`
 	elseif x_type == "vector" then
-		return `vector.create({repr(x.x)}, {repr(x.y)}, {repr(x.z)})`
+		return `vector.create({repr_primitive(x.x, options)}, {repr_primitive(x.y, options)}, {repr_primitive(
+			x.z,
+			options
+		)})`
 	elseif x_type == "buffer" then
-		const show_bytes = (options or DEFAULT_OPTIONS).show_buffer_bytes
+		const show_bytes = options.show_buffer_bytes
 		const len = buffer.len(x)
 
 		if show_bytes then
-			const raw_bytes = buffer.tostring(x)
 			const escapes = table.create(len)
 
 			for index = 1, len do
-				escapes[index] = string.format("\\x%X", string.byte(raw_bytes, index, index))
+				escapes[index] = string.format("\\x%02X", buffer.readu8(x, index - 1))
 			end
 
 			const buffer_string = table.concat(escapes, "")
@@ -132,7 +133,7 @@ const function repr(x: any, options: ReprOptions?)
 			return `buffer.create({len})`
 		end
 	elseif x_type == "function" then
-		const use_debug_name = (options or DEFAULT_OPTIONS).show_function_debug_names
+		const show_debug_name = options.show_function_debug_names
 
 		const arg_count: number, is_variadic: boolean, name: string? = debug.info(x :: () -> (), "an")
 		const arg_list: { string } = {}
@@ -147,57 +148,70 @@ const function repr(x: any, options: ReprOptions?)
 
 		const display_args = table.concat(arg_list, ", ")
 
-		return `function {if use_debug_name then name or "" else ""}({display_args}) end`
-	elseif x_type == "table" then
-		const format_tables = (options or DEFAULT_OPTIONS).pretty_tables
-
-		const active: { [any]: number } = {}
-		local depth = 0
-
-		const function process(current: any)
-			if type(current) ~= "table" then
-				return repr(current)
-			end
-
-			if active[current] ~= nil then
-				return `\{ RECURSIVE +{depth - active[current] - 1} }`
-			end
-
-			active[current] = depth
-
-			depth += 1
-
-			const rendered_pairs = {}
-
-			for key, value in current do
-				table.insert(rendered_pairs, {
-					key = if is_luau_identifier(key) then tostring(key) else `[{process(key)}]`,
-					value = process(value),
-				})
-			end
-
-			depth -= 1
-
-			table.sort(rendered_pairs, sort_pairs)
-
-			local output = render_table(rendered_pairs, depth, format_tables)
-			const metatable = getmetatable(current) :: any?
-
-			if type(metatable) == "table" then
-				output = `setmetatable({output}, {process(metatable)})`
-			end
-
-			if table.isfrozen(current) then
-				output = `table.freeze({output})`
-			end
-
-			return output
-		end
-
-		return process(x)
+		return `function {if show_debug_name and is_luau_identifier(name) then name else ""}({display_args}) ... end`
 	end
 
 	return `<{x}>`
+end
+
+const function repr_table(current: { [any]: any }, seen: { [any]: number }, depth: number, options: ReprOptions): string
+	if seen[current] ~= nil then
+		return "{ RECURSIVE }"
+	end
+
+	depth += 1
+	seen[current] = depth
+
+	const rendered_pairs = {}
+
+	for key, value in current do
+		const field_key = if is_luau_identifier(key)
+			then tostring(key)
+			else `[{(if type(key) == "table"
+				then repr_table(key, seen, depth, options)
+				else repr_primitive(key, options))}]`
+		const field_value = if type(value) == "table"
+			then repr_table(value, seen, depth, options)
+			else repr_primitive(value, options)
+
+		table.insert(rendered_pairs, {
+			key = field_key,
+			value = field_value,
+		})
+	end
+
+	table.sort(rendered_pairs, sort_pairs)
+
+	depth -= 1
+
+	local output = render_table(rendered_pairs, depth, options.pretty_tables)
+	const metatable = getmetatable(current) :: any?
+
+	if type(metatable) == "table" then
+		output = `setmetatable({output}, {repr_table(metatable, seen, depth, options)})`
+	end
+
+	if table.isfrozen(current) then
+		output = `table.freeze({output})`
+	end
+
+	seen[current] = nil
+
+	return output
+end
+
+const function repr(x: any, options: ReprOptions?): string
+	const x_type = type(x)
+
+	options = options or DEFAULT_OPTIONS
+
+	if x_type == "table" then
+		const seen = {}
+
+		return repr_table(x, seen, 0, options)
+	end
+
+	return repr_primitive(x, options)
 end
 
 return repr
