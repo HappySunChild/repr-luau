@@ -1,8 +1,8 @@
 # repr-luau
 A Luau implementation of [Python's builtin `repr`](https://docs.python.org/3/library/functions.html#repr).
 
-The output of this `repr` implementation is not able to be converted back into its original form (as that's not technically possible currently),
-so instead this implementation is largely meant for displaying debug information easily (e.g. in a REPL or debug HUD).
+The output of this `repr` implementation is not intended to be converted back into the original value (as that's not technically possible currently).
+Instead this implementation is largely meant for displaying debug information easily (e.g. in a REPL or debug HUD).
 
 
 ## Example Usage
