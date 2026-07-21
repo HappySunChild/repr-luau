@@ -3,7 +3,6 @@ export type ReprOptions = {
 	show_function_debug_names: boolean?,
 	show_function_bodies: boolean?,
 	show_buffer_bytes: boolean?,
-	show_table_fields: boolean?,
 	convert_numerical_language_constants: boolean?,
 	max_table_depth: number?,
 }
@@ -13,7 +12,6 @@ const DEFAULT_OPTIONS: ReprOptions = {
 	show_function_debug_names = false,
 	show_function_bodies = true,
 	show_buffer_bytes = true,
-	show_table_fields = true,
 	convert_numerical_language_constants = true,
 	max_table_depth = 20, -- seems reasonable to me
 }
@@ -174,7 +172,7 @@ const function repr_table(
 	depth: number,
 	options: ReprOptions
 ): string
-	if not options.show_table_fields or options.max_table_depth ~= nil and depth >= options.max_table_depth then
+	if options.max_table_depth ~= nil and depth >= options.max_table_depth then
 		return "{ ... }"
 	end
 

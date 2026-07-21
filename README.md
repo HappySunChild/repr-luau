@@ -49,6 +49,5 @@ This implementation also provides a way to easily configure the output, like whe
 | `show_function_debug_names`            | `boolean` | `false` | Whether function debug names are used.                                            |
 | `show_function_bodies`                 | `boolean` | `true`  | Whether empty function bodies are included.                                       |
 | `show_buffer_bytes`                    | `boolean` | `true`  | Whether buffers are displayed using their raw hex bytes.                          |
-| `show_table_fields`                    | `boolean` | `true`  | Whether table contents are included.                                              |
 | `convert_numerical_language_constants` | `boolean` | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. |
 | `max_table_depth`                      | `number`  | `20`    | Maximum table nesting depth to display.                                           |
