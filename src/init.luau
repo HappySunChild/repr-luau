@@ -3,6 +3,7 @@ export type ReprOptions = {
 	show_function_debug_names: boolean?,
 	show_function_bodies: boolean?,
 	show_buffer_bytes: boolean?,
+	show_explicit_array_keys: boolean?,
 	convert_numerical_language_constants: boolean?,
 	max_table_depth: number?,
 }
@@ -12,14 +13,13 @@ const DEFAULT_OPTIONS: ReprOptions = {
 	show_function_debug_names = false,
 	show_function_bodies = true,
 	show_buffer_bytes = true,
+	show_explicit_array_keys = false,
 	convert_numerical_language_constants = true,
 	max_table_depth = 20, -- seems reasonable to me
 }
 
-type RenderedPair = { key: string, value: string }
-
-const function render_table(rendered_pairs: { RenderedPair }, indent: number, pretty: boolean): string
-	if #rendered_pairs == 0 then
+const function render_table(record_part: { string }, array_part: { string }, indent: number, pretty: boolean): string
+	if #record_part + #array_part == 0 then
 		return "{}"
 	end
 
@@ -28,26 +28,30 @@ const function render_table(rendered_pairs: { RenderedPair }, indent: number, pr
 		const inner_indent = string.rep("\t", indent + 1)
 		const lines = { "{" }
 
-		for i, pair in rendered_pairs do
-			lines[i + 1] = `{inner_indent}{pair.key} = {pair.value},`
+		for _, value in array_part do
+			table.insert(lines, `{inner_indent}{value},`)
+		end
+
+		for _, pair in record_part do
+			table.insert(lines, `{inner_indent}{pair},`)
 		end
 
 		table.insert(lines, `{outer_indent}}`)
 
 		return table.concat(lines, "\n")
 	else
-		const fields = table.create(#rendered_pairs)
+		const fields = table.create(#record_part + #array_part)
 
-		for _, pair in rendered_pairs do
-			table.insert(fields, `{pair.key} = {pair.value}`)
+		for _, value in array_part do
+			table.insert(fields, value)
+		end
+
+		for _, pair in record_part do
+			table.insert(fields, pair)
 		end
 
 		return `\{ {table.concat(fields, ", ")} }`
 	end
-end
-
-const function sort_pairs(a: RenderedPair, b: RenderedPair): boolean
-	return a.key < b.key
 end
 
 const LUAU_KEYWORDS = {
@@ -167,7 +171,7 @@ const function repr_primitive(x: any, options: ReprOptions): string
 end
 
 const function repr_table(
-	current: { [any]: any },
+	current_t: { [any]: any },
 	showing: { [any]: number },
 	depth: number,
 	options: ReprOptions
@@ -176,44 +180,52 @@ const function repr_table(
 		return "{ ... }"
 	end
 
-	if showing[current] ~= nil then
-		return `\{ RECURSIVE +{depth - showing[current]} }`
+	if showing[current_t] ~= nil then
+		return `\{ RECURSIVE +{depth - showing[current_t]} }`
 	end
 
-	showing[current] = depth
+	const show_array_keys = options.show_explicit_array_keys
 
-	const rendered_pairs = {}
+	showing[current_t] = depth
 
-	for key, value in current do
+	const record_part: { string } = {}
+	const array_part: { string } = {}
+
+	const array_len = #current_t
+
+	for key: any, value: any in current_t do
+		const field_value = if type(value) == "table"
+			then repr_table(value, showing, depth + 1, options)
+			else repr_primitive(value, options)
+
+		if not show_array_keys and type(key) == "number" and key > 0 and key <= array_len then
+			table.insert(array_part, field_value)
+			continue
+		end
+
 		const field_key = if is_luau_identifier(key)
 			then tostring(key)
 			else `[{(if type(key) == "table"
 				then repr_table(key, showing, depth + 1, options)
 				else repr_primitive(key, options))}]`
-		const field_value = if type(value) == "table"
-			then repr_table(value, showing, depth + 1, options)
-			else repr_primitive(value, options)
 
-		table.insert(rendered_pairs, {
-			key = field_key,
-			value = field_value,
-		})
+		table.insert(record_part, `{field_key} = {field_value}`)
 	end
 
-	table.sort(rendered_pairs, sort_pairs)
+	table.sort(record_part)
 
-	local output = render_table(rendered_pairs, depth, options.pretty_tables)
-	const metatable = getmetatable(current) :: any?
+	local output = render_table(record_part, array_part, depth, options.pretty_tables)
+	const metatable = getmetatable(current_t) :: any?
 
 	if type(metatable) == "table" then
 		output = `setmetatable({output}, {repr_table(metatable, showing, depth, options)})`
 	end
 
-	if table.isfrozen(current) then
+	if table.isfrozen(current_t) then
 		output = `table.freeze({output})`
 	end
 
-	showing[current] = nil
+	showing[current_t] = nil
 
 	return output
 end
