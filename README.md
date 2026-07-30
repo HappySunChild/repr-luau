@@ -54,12 +54,118 @@ setmetatable({}, { RECURSIVE +0 })
 ## Options
 This implementation also provides a way to easily configure the output. Here's a full list of options that are currently provided:
 
-| Option                                 | Type      | Default | Description                                                                       |
-| -------------------------------------- | --------- | ------- | --------------------------------------------------------------------------------- |
-| `pretty_tables`                        | `boolean` | `true`  | Whether to pretty-print tables with indentation, newlines, etc.                   |
-| `show_function_debug_names`            | `boolean` | `false` | Whether function debug names are used.                                            |
-| `show_function_bodies`                 | `boolean` | `true`  | Whether empty function bodies are included.                                       |
-| `show_buffer_bytes`                    | `boolean` | `true`  | Whether buffers are displayed using their raw hex bytes.                          |
-| `show_explicit_array_keys`             | `boolean` | `false` | Whether the numerical keys for the array part of a table are explicitly shown.    |
-| `convert_numerical_language_constants` | `boolean` | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. |
-| `max_table_depth`                      | `number`  | `20`    | Maximum table nesting depth to display.                                           |
+| Option                                 | Type      | Default | Description                                                                       | Example Output                                   |
+| -------------------------------------- | --------- | ------- | --------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `pretty_tables`                        | `boolean` | `true`  | Whether to pretty-print tables with indentation, newlines, etc.                   | [example](#pretty_tables)                        |
+| `show_function_debug_names`            | `boolean` | `false` | Whether function debug names are used.                                            | [example](#show_function_debug_names)            |
+| `show_function_bodies`                 | `boolean` | `true`  | Whether empty function bodies are included.                                       | [example](#show_function_bodies)                 |
+| `show_buffer_bytes`                    | `boolean` | `true`  | Whether buffers are displayed using their raw hex bytes.                          | [example](#show_buffer_bytes)                    |
+| `show_explicit_array_keys`             | `boolean` | `false` | Whether the numerical keys for the array part of a table are explicitly shown.    | [example](#show_explicit_array_keys)             |
+| `convert_numerical_language_constants` | `boolean` | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. | [example](#convert_numerical_language_constants) |
+| `max_table_depth`                      | `number`  | `20`    | Maximum table nesting depth to display.                                           | [example](#max_table_depth)                      |
+
+---
+### Option Output Examples
+
+#### `pretty_tables`
+**true**
+```text
+{
+	a = "hello"
+	b = 100,
+	c = {
+		123,
+		"world"
+	}
+}
+```
+**false**
+```text
+{ a = "hello", b = 100, c = { 123, "world } }
+```
+
+#### `show_function_debug_names`
+**true**
+```text
+function hello() end
+```
+**false**
+```text
+function () end
+```
+
+#### `show_function_bodies`
+**true**
+```text
+function () end
+```
+**false**
+```text
+function ()
+```
+
+#### `show_buffer_bytes`
+**true**
+```text
+buffer.fromstring("\x68\x65\x6C\x6C\x6F\x77\x6F\x72\x6C\x64")
+```
+**false**
+```text
+buffer.create(10)
+```
+
+#### `show_explicit_array_keys`
+**true**
+```text
+{
+	[1] = "hello",
+	[2] = "world,
+	[3] = {
+		[1] = true,
+		[2] = false
+	}
+}
+```
+**false**
+```text
+{
+	"hello",
+	"world",
+	{
+		true,
+		false,
+	},
+}
+```
+
+#### `convert_numerical_language_constants`
+**true**
+```text
+math.huge
+```
+**false**
+```text
+inf
+```
+
+#### `max_table_depth`
+**5**
+```text
+{
+	a = 1,
+	b = 2,
+	c = {
+		1,
+		2,
+		3,
+	}
+}
+```
+**1**
+```text
+{
+	a = 1,
+	b = 2,
+	c = { ... },
+}
+```
