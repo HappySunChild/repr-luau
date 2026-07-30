@@ -34,14 +34,25 @@ Output:
 
 ### Recursive Tables
 To prevent infinite loops from occurring, this implementation detects recursive tables and replaces them with `"{ RECURSIVE +N }"`.
-The `N` indicates how many parent levels up the referenced table appears, so for example `{ a = { RECURSIVE +1 } }` would mean that `a` points to the table that contains it which would look something like this in Luau:
+The `N` indicates how many parent levels up the referenced table appears. For example, `{ a = { RECURSIVE +1 } }` would mean that `a` points to the table it is contained within, which in Luau would look something like this:
 ```luau
 local t = {}
 t.a = t
 ```
+Recursive metatables are also detected, and are shown as `{ RECURSIVE +0 }`.
+```luau
+local t = {}
+setmetatable(t, t)
+```
+
+Output:
+
+```text
+setmetatable({}, { RECURSIVE +0 })
+```
 
 ## Options
-This implementation also provides a way to easily configure the output, like whether tables are pretty formatted. Here's a full list of options that are currently provided:
+This implementation also provides a way to easily configure the output. Here's a full list of options that are currently provided:
 
 | Option                                 | Type      | Default | Description                                                                       |
 | -------------------------------------- | --------- | ------- | --------------------------------------------------------------------------------- |
