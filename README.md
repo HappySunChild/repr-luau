@@ -68,7 +68,15 @@ This implementation also provides a way to easily configure the output. Here's a
 ### Option Output Examples
 
 #### `pretty_tables`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 {
 	a = "hello"
@@ -79,43 +87,116 @@ This implementation also provides a way to easily configure the output. Here's a
 	}
 }
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 { a = "hello", b = 100, c = { 123, "world } }
 ```
 
+</td>
+</tr>
+</table>
+
 #### `show_function_debug_names`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 function hello() end
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 function () end
 ```
 
+</td>
+</tr>
+</table>
+
 #### `show_function_bodies`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 function () end
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 function ()
 ```
 
+</td>
+</tr>
+</table>
+
 #### `show_buffer_bytes`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 buffer.fromstring("\x68\x65\x6C\x6C\x6F\x77\x6F\x72\x6C\x64")
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 buffer.create(10)
 ```
 
+</td>
+</tr>
+</table>
+
+
 #### `show_explicit_array_keys`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 {
 	[1] = "hello",
@@ -126,7 +207,13 @@ buffer.create(10)
 	}
 }
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 {
 	"hello",
@@ -138,18 +225,48 @@ buffer.create(10)
 }
 ```
 
+</td>
+</tr>
+</table>
+
 #### `convert_numerical_language_constants`
-**true**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>true</code></td>
+<td>
+
 ```text
 math.huge
 ```
-**false**
+
+</td>
+</tr>
+<tr>
+<td><code>false</code></td>
+<td>
+
 ```text
 inf
 ```
 
+</td>
+</tr>
+</table>
+
 #### `max_table_depth`
-**5**
+<table>
+<tr>
+<th>Value</th>
+<th>Output</th>
+</tr>
+<tr>
+<td><code>5</code></td>
+<td>
+
 ```text
 {
 	a = 1,
@@ -161,7 +278,13 @@ inf
 	}
 }
 ```
-**1**
+
+</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>
+
 ```text
 {
 	a = 1,
@@ -169,3 +292,7 @@ inf
 	c = { ... },
 }
 ```
+
+</td>
+</tr>
+</table>
