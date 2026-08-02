@@ -20,6 +20,18 @@ const DEFAULT_OPTIONS: ReprOptions = {
 	max_table_depth = 20,
 }
 
+const function merge_tables(tab_a: any, tab_b: any): any
+	const merged = table.clone(tab_a)
+
+	for key, value in tab_b do
+		if merged[key] == nil then
+			merged[key] = value
+		end
+	end
+
+	return merged
+end
+
 const function render_table(record_part: { string }, array_part: { string }, indent: number, pretty: boolean?): string
 	if #record_part + #array_part == 0 then
 		return "{}"
@@ -233,9 +245,11 @@ const function repr_table(t: { [any]: any }, showing: { [any]: number }, depth: 
 end
 
 const function repr(v: any, options: ReprOptions?): string
-	options = options or DEFAULT_OPTIONS
+	const actual_options: ReprOptions = if options == nil
+		then DEFAULT_OPTIONS
+		else merge_tables(options, DEFAULT_OPTIONS)
 
-	return if type(v) == "table" then repr_table(v, {}, 0, options) else repr_primitive(v, options)
+	return if type(v) == "table" then repr_table(v, {}, 0, actual_options) else repr_primitive(v, actual_options)
 end
 
 return repr
