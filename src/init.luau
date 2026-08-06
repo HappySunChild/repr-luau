@@ -10,13 +10,12 @@ export type ReprOptions = {
 	show_instance_full_names: boolean?,
 	show_color3_as_decimals: boolean?,
 }
-type ReprFormatter = (v: any, context: ReprContext, repr: (v: any) -> string) -> string
-
-type ReprContext = {
+type ReprContext = ReprOptions & {
+	repr: (v: any) -> string,
 	table_showing: { [any]: number },
 	table_depth: number,
-	options: ReprOptions,
 }
+type ReprFormatter = (v: any, context: ReprContext) -> string
 
 const DEFAULT_OPTIONS: ReprOptions = {
 	pretty_tables = true,
@@ -153,8 +152,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 	boolean = function(v: boolean): string
 		return tostring(v)
 	end,
-	number = function(v: number, context: ReprContext): string
-		if context.options.convert_numerical_language_constants then
+	number = function(v: number, context): string
+		if context.convert_numerical_language_constants then
 			if v == math.huge then
 				return "math.huge"
 			elseif v == -math.huge then
@@ -166,16 +165,17 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return tostring(v)
 	end,
-	integer = function(v: integer, context: ReprContext): string
+	integer = function(v: integer): string
 		return `{v}i`
 	end,
-	vector = function(v: vector, context: ReprContext, repr: (any) -> string): string
+	vector = function(v: vector, context): string
+		const repr = context.repr
 		return `vector.create({repr(v.x)}, {repr(v.y)}, {repr(v.z)})`
 	end,
-	buffer = function(v: buffer, context: ReprContext): string
+	buffer = function(v: buffer, context): string
 		const len = buffer.len(v)
 
-		if context.options.show_buffer_bytes then
+		if context.show_buffer_bytes then
 			const escapes = table.create(len)
 
 			for index = 1, len do
@@ -189,9 +189,9 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 			return `buffer.create({len})`
 		end
 	end,
-	["function"] = function(v: () -> (), context: ReprContext): string
-		const show_debug_name = context.options.show_function_debug_names
-		const show_body = context.options.show_function_bodies
+	["function"] = function(v: (...any) -> ...any, context): string
+		const show_debug_name = context.show_function_debug_names
+		const show_body = context.show_function_bodies
 
 		const arg_count: number, is_variadic: boolean, debug_name: string? = debug.info(v :: () -> (), "an")
 		const arg_list: { string } = {}
@@ -210,22 +210,21 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `function {display_name}({display_args}){display_body}`
 	end,
-	table = function(v: { [any]: any }, context: ReprContext, repr: (any) -> string): string
-		const options = context.options
-		const depth = context.table_depth
+	table = function(v: { [any]: any }, context): string
+		const current_depth = context.table_depth
 		const showing = context.table_showing
 
-		if options.max_table_depth ~= nil and depth >= options.max_table_depth then
+		if context.max_table_depth ~= nil and current_depth >= context.max_table_depth then
 			return "{ ... }"
 		end
 
 		if showing[v] ~= nil then
-			return `\{ RECURSIVE +{depth - showing[v]} }`
+			return `\{ RECURSIVE +{current_depth - showing[v]} }`
 		end
 
-		const show_array_keys = options.show_explicit_array_keys
+		const show_array_keys = context.show_explicit_array_keys
 
-		showing[v] = depth
+		showing[v] = current_depth
 
 		context.table_depth += 1
 
@@ -233,6 +232,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 		const array_part: { string } = {}
 
 		const array_len = #v
+
+		const repr = context.repr
 
 		for key: any, value: any in v do
 			const field_value = repr(value)
@@ -255,7 +256,7 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		table.sort(record_part)
 
-		local output = render_table(record_part, array_part, depth, options.pretty_tables)
+		local output = render_table(record_part, array_part, current_depth, context.pretty_tables)
 		const metatable = getmetatable(v) :: any?
 
 		context.table_depth -= 1
@@ -273,7 +274,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 		return output
 	end,
 
-	Axes = function(v: Axes, _, repr: (any) -> string): string
+	Axes = function(v: Axes, context): string
+		const repr = context.repr
 		const args = {}
 
 		if v.X then
@@ -288,20 +290,31 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `Axes.new({table.concat(args, ", ")})`
 	end,
-	BrickColor = function(v: BrickColor, _, repr: (any) -> string): string
+	BrickColor = function(v: BrickColor, context): string
+		const repr = context.repr
 		return `BrickColor.new({repr(v.Name)})`
 	end,
-	CFrame = function(v: CFrame): string
-		return `CFrame.new({table.concat({ v:GetComponents() }, ", ")})`
+	CFrame = function(v: CFrame, context): string
+		const repr = context.repr
+		const args = {}
+
+		for _, component in { v:GetComponents() } do
+			table.insert(args, repr(component))
+		end
+
+		return `CFrame.new({table.concat(args, ", ")})`
 	end,
-	Color3 = function(v: Color3, context: ReprContext, repr: (any) -> string): string
-		if context.options.show_color3_as_decimals then
+	Color3 = function(v: Color3, context): string
+		const repr = context.repr
+
+		if context.show_color3_as_decimals then
 			return `Color3.new({repr(v.R)}, {repr(v.G)}, {repr(v.B)})`
 		end
 
 		return string.format("Color3.fromRGB(%s, %s, %s)", repr(v.R * 255), repr(v.G * 255), repr(v.B * 255))
 	end,
-	ColorSequence = function(v: ColorSequence, _, repr: (any) -> string): string
+	ColorSequence = function(v: ColorSequence, context): string
+		const repr = context.repr
 		const keypoints = v.Keypoints
 
 		if #keypoints > 2 then
@@ -316,10 +329,12 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `ColorSequence.new({repr(first.Value)}, {repr(second.Value)})`
 	end,
-	ColorSequenceKeypoint = function(v: ColorSequenceKeypoint, _, repr: (any) -> string): string
+	ColorSequenceKeypoint = function(v: ColorSequenceKeypoint, context): string
+		const repr = context.repr
 		return `ColorSequenceKeypoint.new({repr(v.Time)}, {repr(v.Value)})`
 	end,
-	Content = function(v: Content, _, repr: (any) -> string): string
+	Content = function(v: Content, context): string
+		const repr = context.repr
 		const source_type = v.SourceType
 
 		if source_type == Enum.ContentSourceType.None then
@@ -332,8 +347,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `<Content {source_type.Name}>`
 	end,
-	DateTime = function(v: DateTime, _, repr: (any) -> string): string
-		return `DateTime.fromUnixTimestamp({repr(v.UnixTimestamp)})`
+	DateTime = function(v: DateTime, context): string
+		return `DateTime.fromUnixTimestamp({context.repr(v.UnixTimestamp)})`
 	end,
 	Enums = function(): string
 		return "Enums"
@@ -344,7 +359,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 	EnumItem = function(v: EnumItem): string
 		return `Enums.{v.EnumType}.{v.Name}`
 	end,
-	Faces = function(v: Faces, _, repr: (any) -> string): string
+	Faces = function(v: Faces, context): string
+		const repr = context.repr
 		const args = {}
 
 		if v.Top then
@@ -373,8 +389,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `Faces.new({table.concat(args, ", ")})`
 	end,
-	Instance = function(v: Instance, context: ReprContext): string
-		if not context.options.show_instance_full_names then
+	Instance = function(v: Instance, context): string
+		if not context.show_instance_full_names then
 			return v.Name
 		end
 
@@ -398,14 +414,17 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return table.concat(path, "")
 	end,
-	NumberRange = function(v: NumberRange, _, repr: (any) -> string): string
+	NumberRange = function(v: NumberRange, context): string
+		const repr = context.repr
+
 		if v.Min == v.Max then
 			return `NumberRange.new({repr(v.Min)})`
 		end
 
 		return `NumberRange.new({repr(v.Min)}, {repr(v.Max)})`
 	end,
-	NumberSequence = function(v: NumberSequence, _, repr: (any) -> string): string
+	NumberSequence = function(v: NumberSequence, context): string
+		const repr = context.repr
 		const keypoints = v.Keypoints
 
 		if #keypoints > 2 then
@@ -420,7 +439,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `NumberSequence.new({repr(first.Value)}, {repr(second.Value)})`
 	end,
-	NumberSequenceKeypoint = function(v: NumberSequenceKeypoint, _, repr: (any) -> string): string
+	NumberSequenceKeypoint = function(v: NumberSequenceKeypoint, context): string
+		const repr = context.repr
 		const envelope = v.Envelope
 
 		if envelope == 0 then
@@ -429,10 +449,12 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `NumberSequenceKeypoint.new({repr(v.Time)}, {repr(v.Value)}, {repr(envelope)})`
 	end,
-	PathWaypoint = function(v: PathWaypoint, _, repr: (any) -> string): string
+	PathWaypoint = function(v: PathWaypoint, context): string
+		const repr = context.repr
 		return `PathWaypoint.new({repr(v.Position)}, {repr(v.Action)}, {repr(v.Label)})`
 	end,
-	PhysicalProperties = function(v: PhysicalProperties, _, repr: (any) -> string): string
+	PhysicalProperties = function(v: PhysicalProperties, context): string
+		const repr = context.repr
 		return string.format(
 			"PhysicalProperties.new(%s, %s, %s, %s, %s, %s)",
 			repr(v.Density),
@@ -443,25 +465,29 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 			repr(v.AcousticAbsorption)
 		)
 	end,
-	Random = function(v: Random): string
+	Random = function(): string
 		return "Random.new()"
 	end,
-	Ray = function(v: Ray, _, repr: (any) -> string): string
+	Ray = function(v: Ray, context): string
+		const repr = context.repr
 		return `Ray.new({repr(v.Origin)}, {repr(v.Direction)})`
 	end,
-	RaycastParams = function(v: RaycastParams, _, repr: (any) -> string): string
+	RaycastParams = function(): string
 		return "RaycastParams.new()"
 	end,
-	Rect = function(v: Rect, _, repr: (any) -> string): string
+	Rect = function(v: Rect, context): string
+		const repr = context.repr
 		const min, max = v.Min, v.Max
 		return `Rect.new({repr(min.X)}, {repr(min.Y)}, {repr(max.X)}, {repr(max.Y)})`
 	end,
-	Region3 = function(v: Region3, _, repr: (any) -> string): string
+	Region3 = function(v: Region3, context): string
+		const repr = context.repr
 		const min = v.CFrame * (-v.Size / 2)
 		const max = v.CFrame * (v.Size / 2)
 		return `Region3.new({repr(min)}, {repr(max)})`
 	end,
-	SecurityCapabilities = function(v: SecurityCapabilities, _, repr: (any) -> string): string
+	SecurityCapabilities = function(v: SecurityCapabilities, context): string
+		const repr = context.repr
 		const args = {}
 
 		for _, capability in Enum.SecurityCapability:GetEnumItems() do
@@ -472,7 +498,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 
 		return `SecurityCapabilities.new({table.concat(args, ", ")})`
 	end,
-	TweenInfo = function(v: TweenInfo, _, repr: (any) -> string): string
+	TweenInfo = function(v: TweenInfo, context): string
+		const repr = context.repr
 		return string.format(
 			"TweenInfo.new(%s, %s, %s, %s, %s)",
 			repr(v.Time),
@@ -482,20 +509,24 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 			repr(v.Reverses)
 		)
 	end,
-	UDim = function(v: UDim, _, repr: (any) -> string): string
+	UDim = function(v: UDim, context): string
+		const repr = context.repr
 		return `UDim.new({repr(v.Scale)}, {repr(v.Offset)})`
 	end,
-	UDim2 = function(v: UDim2, _, repr: (any) -> string): string
+	UDim2 = function(v: UDim2, context): string
+		const repr = context.repr
 		const x, y = v.X, v.Y
 		return `UDim2.new({repr(x.Scale)}, {repr(x.Offset)}, {repr(y.Scale)}, {repr(y.Offset)})`
 	end,
-	User = function(v: User, _, repr: (any) -> string): string
-		return `User.fromId({repr(v.Id)})`
+	User = function(v: User, context): string
+		return `User.fromId({context.repr(v.Id)})`
 	end,
-	Vector2 = function(v: Vector2, _, repr: (any) -> string): string
+	Vector2 = function(v: Vector2, context): string
+		const repr = context.repr
 		return `Vector2.new({repr(v.X)}, {repr(v.Y)})`
 	end,
-	Vector3 = function(v: Vector3, _, repr: (any) -> string): string
+	Vector3 = function(v: Vector3, context): string
+		const repr = context.repr
 		return `Vector3.new({repr(v.X)}, {repr(v.Y)}, {repr(v.Z)})`
 	end,
 }
@@ -505,22 +536,25 @@ const function recursive_repr(v: any, context: ReprContext): string
 	const formatter = DEFAULT_FORMATTERS[v_type]
 
 	if formatter ~= nil then
-		return formatter(v, context, function(v): string
-			return recursive_repr(v, context)
-		end)
+		return formatter(v, context)
 	end
 
 	return `<{v_type}: {v}>`
 end
 
 const function repr(v: any, options: ReprOptions?): string
-	const context: ReprContext = {
-		options = if options == nil then DEFAULT_OPTIONS else merge_tables(options, DEFAULT_OPTIONS),
-		table_depth = 0,
-		table_showing = {},
-	}
+	const context: ReprContext = if options == nil
+		then DEFAULT_OPTIONS :: any
+		else merge_tables(options, DEFAULT_OPTIONS)
+	context.table_showing = {}
+	context.table_depth = 0
+	context.repr = function(v: any): string
+		return recursive_repr(v, context)
+	end
 
 	return recursive_repr(v, context)
 end
+
+print(repr(DEFAULT_FORMATTERS))
 
 return repr
