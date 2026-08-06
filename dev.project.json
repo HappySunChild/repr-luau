@@ -1,0 +1,21 @@
+{
+	"name": "repr",
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"repr": {
+				"$path": "src"
+			}
+		},
+		"ServerScriptService": {
+			"$ignoreUnknownInstances": true,
+			"devtests": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true,
+				"repr": {
+					"$path": "dev"
+				}
+			}
+		}
+	}
+}

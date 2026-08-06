@@ -1,5 +1,3 @@
---!optimize 2
---!strict
 export type ReprOptions = {
 	pretty_tables: boolean?,
 	show_function_debug_names: boolean?,
@@ -9,6 +7,14 @@ export type ReprOptions = {
 	convert_numerical_language_constants: boolean?,
 	max_table_depth: number?,
 }
+
+type ReprContext = {
+	table_showing: { [any]: number },
+	table_depth: number,
+	options: ReprOptions,
+}
+
+type ReprRenderer = (v: any, context: ReprContext, repr: (v: any) -> string) -> string
 
 const DEFAULT_OPTIONS: ReprOptions = {
 	pretty_tables = true,
@@ -94,36 +100,21 @@ const LUAU_KEYWORDS = {
 }
 
 const function is_luau_identifier(v: any): boolean
-	if type(v) ~= "string" then
-		return false
-	end
-
-	if string.len(v) == 0 then
-		return false
-	end
-
-	if string.match(v, "^[%a_][%w_]*$") == nil then
-		return false
-	end
-
-	if LUAU_KEYWORDS[v] then
-		return false
-	end
-
-	return true
+	return type(v) == "string" and string.match(v, "^[%a_][%w_]*$") ~= nil and not LUAU_KEYWORDS[v]
 end
 
-const function repr_primitive(v: any, options: ReprOptions): string
-	const v_type = type(v)
-
-	if v_type == "nil" then
+const DEFAULT_FORMATTERS: { [string]: ReprRenderer } = {
+	["nil"] = function(): string
 		return "nil"
-	elseif v_type == "string" then
+	end,
+	string = function(v: string): string
 		return string.format("%q", v)
-	elseif v_type == "boolean" then
+	end,
+	boolean = function(v: boolean): string
 		return tostring(v)
-	elseif v_type == "number" then
-		if options.convert_numerical_language_constants then
+	end,
+	number = function(v: number, context: ReprContext): string
+		if context.options.convert_numerical_language_constants then
 			if v == math.huge then
 				return "math.huge"
 			elseif v == -math.huge then
@@ -134,18 +125,17 @@ const function repr_primitive(v: any, options: ReprOptions): string
 		end
 
 		return tostring(v)
-	elseif v_type == "integer" then -- integers are generally niche, but they are technically a different data type
+	end,
+	integer = function(v: integer, context: ReprContext): string
 		return `{v}i`
-	elseif v_type == "vector" then
-		return `vector.create({repr_primitive(v.x, options)}, {repr_primitive(v.y, options)}, {repr_primitive(
-			v.z,
-			options
-		)})`
-	elseif v_type == "buffer" then
-		const show_bytes = options.show_buffer_bytes
+	end,
+	vector = function(v: vector, context: ReprContext, repr: (any) -> string): string
+		return `vector.create({repr(v.x)}, {repr(v.y)}, {repr(v.z)})`
+	end,
+	buffer = function(v: buffer, context: ReprContext): string
 		const len = buffer.len(v)
 
-		if show_bytes then
+		if context.options.show_buffer_bytes then
 			const escapes = table.create(len)
 
 			for index = 1, len do
@@ -158,9 +148,10 @@ const function repr_primitive(v: any, options: ReprOptions): string
 		else
 			return `buffer.create({len})`
 		end
-	elseif v_type == "function" then
-		const show_debug_name = options.show_function_debug_names
-		const show_body = options.show_function_bodies
+	end,
+	["function"] = function(v: () -> (), context: ReprContext): string
+		const show_debug_name = context.options.show_function_debug_names
+		const show_body = context.options.show_function_bodies
 
 		const arg_count: number, is_variadic: boolean, debug_name: string? = debug.info(v :: () -> (), "an")
 		const arg_list: { string } = {}
@@ -178,78 +169,92 @@ const function repr_primitive(v: any, options: ReprOptions): string
 		const display_body = if show_body then " end" else ""
 
 		return `function {display_name}({display_args}){display_body}`
+	end,
+	table = function(v: { [any]: any }, context: ReprContext, repr: (any) -> string): string
+		const options = context.options
+		const depth = context.table_depth
+		const showing = context.table_showing
+
+		if options.max_table_depth ~= nil and depth >= options.max_table_depth then
+			return "{ ... }"
+		end
+
+		if showing[v] ~= nil then
+			return `\{ RECURSIVE +{depth - showing[v]} }`
+		end
+
+		const show_array_keys = options.show_explicit_array_keys
+
+		showing[v] = depth
+
+		context.table_depth += 1
+
+		const record_part: { string } = {}
+		const array_part: { string } = {}
+
+		const array_len = #v
+
+		for key: any, value: any in v do
+			const field_value = repr(value)
+
+			if
+				not show_array_keys
+				and type(key) == "number"
+				and math.floor(key) == key
+				and key > 0
+				and key <= array_len
+			then
+				table.insert(array_part, field_value)
+				continue
+			end
+
+			const field_key = if is_luau_identifier(key) then tostring(key) else `[{(repr(key))}]`
+
+			table.insert(record_part, `{field_key} = {field_value}`)
+		end
+
+		table.sort(record_part)
+
+		local output = render_table(record_part, array_part, depth, options.pretty_tables)
+		const metatable = getmetatable(v) :: any?
+
+		if type(metatable) == "table" then
+			output = `setmetatable({output}, {repr(metatable)})`
+		end
+
+		if table.isfrozen(v) then
+			output = `table.freeze({output})`
+		end
+
+		showing[v] = nil
+
+		context.table_depth -= 1
+
+		return output
+	end,
+}
+
+const function recursive_repr(v: any, context: ReprContext): string
+	const v_type = typeof(v)
+	const formatter = DEFAULT_FORMATTERS[v_type]
+
+	if formatter ~= nil then
+		return formatter(v, context, function(v): string
+			return recursive_repr(v, context)
+		end)
 	end
 
 	return `<{v_type}: {v}>`
 end
 
-const function repr_table(t: { [any]: any }, showing: { [any]: number }, depth: number, options: ReprOptions): string
-	if options.max_table_depth ~= nil and depth >= options.max_table_depth then
-		return "{ ... }"
-	end
-
-	if showing[t] ~= nil then
-		return `\{ RECURSIVE +{depth - showing[t]} }`
-	end
-
-	const show_array_keys = options.show_explicit_array_keys
-
-	showing[t] = depth
-
-	const record_part: { string } = {}
-	const array_part: { string } = {}
-
-	const array_len = #t
-
-	for key: any, value: any in t do
-		const field_value = if type(value) == "table"
-			then repr_table(value, showing, depth + 1, options)
-			else repr_primitive(value, options)
-
-		if
-			not show_array_keys
-			and type(key) == "number"
-			and math.floor(key) == key
-			and key > 0
-			and key <= array_len
-		then
-			table.insert(array_part, field_value)
-			continue
-		end
-
-		const field_key = if is_luau_identifier(key)
-			then tostring(key)
-			else `[{(if type(key) == "table"
-				then repr_table(key, showing, depth + 1, options)
-				else repr_primitive(key, options))}]`
-
-		table.insert(record_part, `{field_key} = {field_value}`)
-	end
-
-	table.sort(record_part)
-
-	local output = render_table(record_part, array_part, depth, options.pretty_tables)
-	const metatable = getmetatable(t) :: any?
-
-	if type(metatable) == "table" then
-		output = `setmetatable({output}, {repr_table(metatable, showing, depth, options)})`
-	end
-
-	if table.isfrozen(t) then
-		output = `table.freeze({output})`
-	end
-
-	showing[t] = nil
-
-	return output
-end
-
 const function repr(v: any, options: ReprOptions?): string
-	const actual_options: ReprOptions = if options == nil
-		then DEFAULT_OPTIONS
-		else merge_tables(options, DEFAULT_OPTIONS)
+	const context: ReprContext = {
+		options = if options == nil then DEFAULT_OPTIONS else merge_tables(options, DEFAULT_OPTIONS),
+		table_depth = 0,
+		table_showing = {},
+	}
 
-	return if type(v) == "table" then repr_table(v, {}, 0, actual_options) else repr_primitive(v, actual_options)
+	return recursive_repr(v, context)
 end
 
 return repr
