@@ -65,7 +65,7 @@ This implementation also provides a way to easily configure the output. Here's a
 | `show_explicit_array_keys`             | `boolean`                                                 | `false` | Whether the numerical keys for the array part of a table are explicitly shown.    | [example](#show_explicit_array_keys)             |
 | `convert_numerical_language_constants` | `boolean`                                                 | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. | [example](#convert_numerical_language_constants) |
 | `max_table_depth`                      | `number`                                                  | `20`    | Maximum table nesting depth to display.                                           | [example](#max_table_depth)                      |
-| `custom_formatters`                    | `{ [string]: (v: any, context: ReprContext) -> string }?` | `nil`   | A map of formatters for overriding default formatters.                            | [example](#)                                     |
+| `custom_formatters`                    | `{ [string]: (v: any, context: ReprContext) -> string }?` | `nil`   | A map of formatters for overriding default formatters.                            | [example](#custom_formatters)                    |
 
 ---
 ### Option Output Examples
