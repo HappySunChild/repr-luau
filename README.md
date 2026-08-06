@@ -56,16 +56,16 @@ setmetatable({}, { RECURSIVE +0 })
 ## Options
 This implementation also provides a way to easily configure the output. Here's a full list of options that are currently provided:
 
-| Option                                 | Type                                                      | Default | Description                                                                       | Example Output                                   |
-| -------------------------------------- | --------------------------------------------------------- | ------- | --------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `pretty_tables`                        | `boolean`                                                 | `true`  | Whether to pretty-print tables with indentation, newlines, etc.                   | [example](#pretty_tables)                        |
-| `show_function_debug_names`            | `boolean`                                                 | `false` | Whether function debug names are used.                                            | [example](#show_function_debug_names)            |
-| `show_function_bodies`                 | `boolean`                                                 | `true`  | Whether empty function bodies are included.                                       | [example](#show_function_bodies)                 |
-| `show_buffer_bytes`                    | `boolean`                                                 | `true`  | Whether buffers are displayed using their raw hex bytes.                          | [example](#show_buffer_bytes)                    |
-| `show_explicit_array_keys`             | `boolean`                                                 | `false` | Whether the numerical keys for the array part of a table are explicitly shown.    | [example](#show_explicit_array_keys)             |
-| `convert_numerical_language_constants` | `boolean`                                                 | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. | [example](#convert_numerical_language_constants) |
-| `max_table_depth`                      | `number`                                                  | `20`    | Maximum table nesting depth to display.                                           | [example](#max_table_depth)                      |
-| `custom_formatters`                    | `{ [string]: (v: any, context: ReprContext) -> string }?` | `nil`   | A map of formatters for overriding default formatters.                            | [example](#custom_formatters)                    |
+| Option                                 | Type                                          | Default | Description                                                                       | Example Output                                   |
+| -------------------------------------- | --------------------------------------------- | ------- | --------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `pretty_tables`                        | `boolean`                                     | `true`  | Whether to pretty-print tables with indentation, newlines, etc.                   | [example](#pretty_tables)                        |
+| `show_function_debug_names`            | `boolean`                                     | `false` | Whether function debug names are used.                                            | [example](#show_function_debug_names)            |
+| `show_function_bodies`                 | `boolean`                                     | `true`  | Whether empty function bodies are included.                                       | [example](#show_function_bodies)                 |
+| `show_buffer_bytes`                    | `boolean`                                     | `true`  | Whether buffers are displayed using their raw hex bytes.                          | [example](#show_buffer_bytes)                    |
+| `show_explicit_array_keys`             | `boolean`                                     | `false` | Whether the numerical keys for the array part of a table are explicitly shown.    | [example](#show_explicit_array_keys)             |
+| `convert_numerical_language_constants` | `boolean`                                     | `true`  | Whether numerical language constants such as `math.huge` and `math.nan` are used. | [example](#convert_numerical_language_constants) |
+| `max_table_depth`                      | `number`                                      | `20`    | Maximum table nesting depth to display.                                           | [example](#max_table_depth)                      |
+| `custom_formatters`                    | `{ [string]: (any, ReprContext) -> string }?` | `nil`   | A map of formatters for overriding default formatters.                            | [example](#custom_formatters)                    |
 
 ---
 ### Option Output Examples
