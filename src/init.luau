@@ -105,6 +105,27 @@ const LUAU_KEYWORDS = {
 	["until"] = true,
 }
 
+const ESCAPE_SEQUENCES: { [string]: string } = {
+	["\\"] = "\\\\",
+	["\n"] = "\\n",
+	["\t"] = "\\t",
+	["\r"] = "\\r",
+	["\v"] = "\\v",
+	["\b"] = "\\b",
+	["\f"] = "\\f",
+	["\a"] = "\\a",
+}
+
+for byte = 1, 31 do
+	const char = string.char(byte)
+
+	if ESCAPE_SEQUENCES[char] then
+		continue
+	end
+
+	ESCAPE_SEQUENCES[char] = `\\{byte}`
+end
+
 const function is_luau_identifier(v: any): boolean
 	return type(v) == "string" and string.match(v, "^[%a_][%w_]*$") ~= nil and not LUAU_KEYWORDS[v]
 end
@@ -114,7 +135,20 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 		return "nil"
 	end,
 	string = function(v: string): string
-		return string.format("%q", v)
+		const escaped = string.gsub(v, ".", ESCAPE_SEQUENCES)
+
+		const contains_quotes = string.find(escaped, '"') ~= nil
+		const contains_apostrophe = string.find(escaped, "'") ~= nil
+
+		if contains_quotes then
+			if contains_apostrophe then
+				return `"{string.gsub(escaped, '"', '\\"')}"`
+			end
+
+			return `'{escaped}'`
+		end
+
+		return `"{escaped}"`
 	end,
 	boolean = function(v: boolean): string
 		return tostring(v)
