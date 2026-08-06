@@ -21,6 +21,7 @@ type ReprContext = {
 const DEFAULT_OPTIONS: ReprOptions = {
 	pretty_tables = true,
 	show_function_debug_names = false,
+
 	show_function_bodies = true,
 	show_buffer_bytes = true,
 	show_explicit_array_keys = false,
@@ -223,6 +224,8 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 		local output = render_table(record_part, array_part, depth, options.pretty_tables)
 		const metatable = getmetatable(v) :: any?
 
+		context.table_depth -= 1
+
 		if type(metatable) == "table" then
 			output = `setmetatable({output}, {repr(metatable)})`
 		end
@@ -232,8 +235,6 @@ const DEFAULT_FORMATTERS: { [string]: ReprFormatter } = {
 		end
 
 		showing[v] = nil
-
-		context.table_depth -= 1
 
 		return output
 	end,
